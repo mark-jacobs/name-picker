@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Scrum Monster</title>
+  <!-- Optional web fonts; the page falls back to local fonts when offline. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="title">
+    <h1>The Scrum Monster</h1>
+    <p class="subtitle">Who shall lead next week's standup?</p>
+  </header>
+
+  <main>
+    <section class="stage-wrap">
+      <canvas id="stage" width="480" height="270" aria-label="A gothic village at night where the Scrum Monster hunts for next week's standup leader"></canvas>
+      <div class="controls">
+        <button id="summon" class="btn btn-primary" type="button">Summon the Scrum Monster</button>
+        <button id="spare" class="btn" type="button" hidden>Spare them</button>
+        <button id="seal" class="btn btn-primary" type="button" hidden>Seal their fate</button>
+        <button id="mute" class="btn" type="button" aria-pressed="false">Sound: on</button>
+      </div>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+
+    <div class="panels">
+      <section class="panel">
+        <h2>The Living</h2>
+        <form id="add-form" class="add-form">
+          <input id="add-name" type="text" placeholder="Add names, separated by commas" autocomplete="off" aria-label="Names to add">
+          <button id="add-button" class="btn" type="submit">Add</button>
+        </form>
+        <ul id="team-list" class="team-list"></ul>
+        <p id="team-empty" class="empty">No one lives here yet.</p>
+        <div class="panel-actions">
+          <button id="new-round" class="btn btn-small" type="button">Start a new round</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>The Graveyard</h2>
+        <p class="hint">Past picks, most recent first.</p>
+        <ol id="graveyard" class="graveyard"></ol>
+        <p id="graveyard-empty" class="empty">No one has been taken yet.</p>
+        <div class="panel-actions">
+          <button id="clear-graveyard" class="btn btn-small btn-danger" type="button">Clear the graveyard</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/art.js"></script>
+  <script src="js/scene.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
