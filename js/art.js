@@ -190,6 +190,17 @@ const Art = (() => {
 
   const VILLAGER_STAND = ['...pp.pp....', '...pp.pp....', '...pp.pp....', '..bbb.bbb...'];
 
+  // Santa hat for Christmas, flopping back over the hood. Its bottom row overlaps the top of the head.
+  const HAT_PALETTE = { R: '#c8202c', Q: '#8e1420', S: '#f2eee6', P: '#ffffff' };
+  const VILLAGER_HAT = [
+    '.PP.........',
+    '.PPRRR......',
+    '...RRRRR....',
+    '..QRRRRR....',
+    '..SSSSSS....',
+  ];
+  const VILLAGER_HAT_LIFT = VILLAGER_HAT.length - 1;
+
   const CLOAKS = [
     ['#8a2f34', '#5c1d22'], ['#2f5688', '#1f385a'], ['#55762f', '#384f1f'], ['#86662f', '#5a441f'],
     ['#63308a', '#41205c'], ['#2f8576', '#1f594e'], ['#9a5224', '#683617'], ['#66667a', '#444452'],
@@ -198,20 +209,23 @@ const Art = (() => {
   const SKINS = ['#e8bf96', '#c98f5e', '#8d5a3a', '#f2cfa8', '#a8714a', '#d8a878'];
 
   const villagerCache = new Map();
-  function villager(style) {
+  function villager(style, xmas = false) {
     const key = Math.abs(style | 0) % CLOAKS.length;
-    if (villagerCache.has(key)) return villagerCache.get(key);
+    const cacheKey = xmas ? `${key}x` : key;
+    if (villagerCache.has(cacheKey)) return villagerCache.get(cacheKey);
     const [c, C] = CLOAKS[key];
-    const pal = { c, C, s: SKINS[(key * 5) % SKINS.length], e: '#140a0a', i: '#2b2424', y: '#ffd866', p: '#3a2e2a', b: '#1c1410' };
+    const pal = { ...HAT_PALETTE, c, C, s: SKINS[(key * 5) % SKINS.length], e: '#140a0a', i: '#2b2424', y: '#ffd866', p: '#3a2e2a', b: '#1c1410' };
     const empty = { ...pal, i: null, y: null }; // lantern dropped
-    const make = (legs, p) => sprite(12, 18, [{ rows: VILLAGER_BODY }, { rows: legs, y: 14 }], p);
+    const lift = xmas ? VILLAGER_HAT_LIFT : 0;
+    const hat = xmas ? [{ rows: VILLAGER_HAT }] : [];
+    const make = (legs, p) => sprite(12, 18 + lift, [{ rows: VILLAGER_BODY, y: lift }, { rows: legs, y: 14 + lift }, ...hat], p);
     const sprites = {
       idle: make(VILLAGER_STAND, pal),
       run: VILLAGER_RUN.map(legs => make(legs, pal)),
       flee: VILLAGER_RUN.map(legs => make(legs, empty)),
       held: [rotate(make(VILLAGER_RUN[0], empty)), rotate(make(VILLAGER_RUN[2], empty))],
     };
-    villagerCache.set(key, sprites);
+    villagerCache.set(cacheKey, sprites);
     return sprites;
   }
 
@@ -338,37 +352,55 @@ const Art = (() => {
     '.......bB.bB..bB.bB.............',
   ];
 
+  // A big Santa hat for the big monster. The bottom two rows (the trim) sit over the top of the head.
+  const MONSTER_HAT = [
+    '........PP......................',
+    '.......PPPRR....................',
+    '........PRRRRRR.................',
+    '...........RRRRRRRR.............',
+    '............QRRRRRRRRR..........',
+    '.............QRRRRRRRRRR........',
+    '.............SSSSSSSSSSSS.......',
+    '............SSSSSSSSSSSSS.......',
+  ];
+  const MONSTER_HAT_LIFT = MONSTER_HAT.length - 2;
+
   // Darkens the far leg so the run cycle reads as alternating legs.
   const DARKER = { g: 'G', G: 'd', J: 'K', j: 'k', w: 'W' };
   function shadeCols(rows, from, to) {
     return rows.map(row => row.split('').map((ch, x) => (x >= from && x <= to && DARKER[ch]) || ch).join(''));
   }
 
-  let monsterSprites = null;
-  function monster() {
-    if (monsterSprites) return monsterSprites;
-    const P = MONSTER_PALETTE;
-    const frame = (legs, dy) => sprite(32, 45, [
-      { rows: legs, y: 30 },
-      { rows: HEAD, y: dy },
-      { rows: TORSO, y: 10 + dy },
-      { rows: FAR_ARM, x: 21, y: 17 + dy },
+  const monsterCache = {};
+  function monster(xmas = false) {
+    const cacheKey = xmas ? 'xmas' : 'plain';
+    if (monsterCache[cacheKey]) return monsterCache[cacheKey];
+    const P = { ...MONSTER_PALETTE, ...HAT_PALETTE };
+    const lift = xmas ? MONSTER_HAT_LIFT : 0;
+    const frame = (legs, dy) => sprite(32, 45 + lift, [
+      { rows: legs, y: 30 + lift },
+      { rows: HEAD, y: lift + dy },
+      { rows: TORSO, y: 10 + lift + dy },
+      { rows: FAR_ARM, x: 21, y: 17 + lift + dy },
+      ...(xmas ? [{ rows: MONSTER_HAT, y: dy }] : []),
     ], P);
     const pass = shadeCols(LEGS_PASS, 15, 31);
     const run = [frame(shadeCols(LEGS_STRIDE, 0, 13), 0), frame(pass, 1), frame(shadeCols(LEGS_STRIDE, 14, 31), 0), frame(pass, 1)];
-    monsterSprites = {
+    monsterCache[cacheKey] = {
       run,
       stand: frame(shadeCols(LEGS_STAND, 0, 12), 0),
       dive: rotate(run[0]),
+      // The roaring head sits lower in this pose, so the hat has room above it without extra rows.
       triumph: sprite(32, 51, [
         { rows: shadeCols(LEGS_STAND, 0, 12), y: 36 },
         { rows: TORSO, y: 16 },
         { rows: TRIUMPH_TOP },
+        ...(xmas ? [{ rows: MONSTER_HAT, x: 5 }] : []),
       ], P),
       // Where the glowing eyes sit within each pose.
-      eyes: { run: [25, 4], stand: [25, 4], triumph: [29, 9] },
+      eyes: { run: [25, 4 + lift], stand: [25, 4 + lift], triumph: [29, 9] },
     };
-    return monsterSprites;
+    return monsterCache[cacheKey];
   }
 
   // ---------------------------------------------------------------- odds and ends
@@ -396,6 +428,6 @@ const Art = (() => {
   return {
     canvas, rng, disc, ellipse, line, roof, sprite, rotate,
     glyphs, textWidth, drawText, label,
-    villager, monster, bats, glow, eyeGlow,
+    villager, monster, bats, glow, eyeGlow, VILLAGER_HAT_LIFT,
   };
 })();

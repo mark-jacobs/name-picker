@@ -10,10 +10,11 @@
 (() => {
   const STORAGE_KEY = 'scrum-monster-picker.v1';
   const MUTE_KEY = 'scrum-monster-picker.muted';
+  const XMAS_KEY = 'scrum-monster-picker.xmas';
   const MAX_NAME = 24;
   const $ = id => document.getElementById(id);
   const els = {
-    stage: $('stage'), summon: $('summon'), spare: $('spare'), seal: $('seal'), mute: $('mute'), status: $('status'),
+    stage: $('stage'), summon: $('summon'), spare: $('spare'), seal: $('seal'), mute: $('mute'), xmas: $('xmas'), status: $('status'),
     addForm: $('add-form'), addName: $('add-name'), addButton: $('add-button'),
     team: $('team-list'), teamEmpty: $('team-empty'), newRound: $('new-round'),
     graveyard: $('graveyard'), graveyardEmpty: $('graveyard-empty'), clearGraveyard: $('clear-graveyard'),
@@ -21,7 +22,8 @@
 
   let storageOk = true;
   let state = load();
-  let muted = loadMuted();
+  let muted = loadFlag(MUTE_KEY);
+  let xmasForced = loadFlag(XMAS_KEY); // the "Enable Xmas" switch, for trying it out before December
   let phase = 'idle';     // idle | chasing | verdict | releasing
   let spared = new Set(); // people spared during the current summoning
   let snapshot = null;    // state before the current pick, restored by "Spare them"
@@ -58,12 +60,30 @@
     }
   }
 
-  function loadMuted() {
+  function loadFlag(key) {
     try {
-      return localStorage.getItem(MUTE_KEY) === '1';
+      return localStorage.getItem(key) === '1';
     } catch {
       return false;
     }
+  }
+
+  function saveFlag(key, value) {
+    try {
+      localStorage.setItem(key, value ? '1' : '0');
+    } catch { /* not critical */ }
+  }
+
+  // ---------------------------------------------------------------- christmas
+
+  const isDecember = () => new Date().getMonth() === 11;
+  const xmasOn = () => isDecember() || xmasForced;
+
+  function applyXmas() {
+    const on = xmasOn();
+    document.body.classList.toggle('xmas', on);
+    Game.setXmas(on);
+    Sound.setXmas(on);
   }
 
   const clone = s => JSON.parse(JSON.stringify(s));
@@ -238,6 +258,9 @@
     }
     els.mute.textContent = muted ? 'Sound: off' : 'Sound: on';
     els.mute.setAttribute('aria-pressed', String(muted));
+    els.xmas.checked = xmasOn();
+    els.xmas.disabled = isDecember();
+    els.xmas.parentElement.title = isDecember() ? "It's December, so Christmas is on automatically" : 'Try out the Christmas theme early';
     els.status.textContent = statusText();
     els.addName.disabled = !idle;
     els.addButton.disabled = !idle;
@@ -307,9 +330,13 @@
   els.mute.addEventListener('click', () => {
     muted = !muted;
     Sound.setMuted(muted);
-    try {
-      localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
-    } catch { /* not critical */ }
+    saveFlag(MUTE_KEY, muted);
+    render();
+  });
+  els.xmas.addEventListener('change', () => {
+    xmasForced = els.xmas.checked;
+    saveFlag(XMAS_KEY, xmasForced);
+    applyXmas();
     render();
   });
   els.addForm.addEventListener('submit', e => {
@@ -322,6 +349,7 @@
 
   Sound.setMuted(muted);
   Game.init(els.stage);
+  applyXmas();
   refreshIdle();
   render();
 })();

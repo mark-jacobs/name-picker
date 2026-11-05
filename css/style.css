@@ -131,6 +131,47 @@ h1 {
 
 .btn-small { font-size: 19px; padding: 4px 12px; }
 
+/* ---------------------------------------------------------------- xmas switch */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.switch input {
+  appearance: none;
+  position: relative;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  background: var(--stone-dark);
+  box-shadow: inset 2px 2px 0 #000, 0 0 0 3px #000;
+  cursor: pointer;
+}
+
+.switch input::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+  background: var(--mist);
+  transition: left 0.12s;
+}
+
+.switch input:checked { background: #1f6a32; }
+.switch input:checked::after { left: 24px; background: #f2eee6; }
+.switch input:disabled { cursor: not-allowed; opacity: 0.75; }
+.switch input:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
+
+.xmas .subtitle::before { content: '❄ '; }
+.xmas .subtitle::after { content: ' ❄'; }
+
 .btn-danger { color: #f0a0a8; }
 
 /* ---------------------------------------------------------------- panels */

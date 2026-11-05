@@ -24,6 +24,7 @@ const Game = (() => {
   let shake = 0, flash = 0, bolt = null, nextLightning = 6;
   let fade = 0, fadeDir = 0, fadeCb = null;
   let bats = [];
+  let xmas = false, snow = [];
 
   const clamp01 = v => Math.max(0, Math.min(1, v));
   const lerp = (a, b, u) => a + (b - a) * u;
@@ -45,6 +46,9 @@ const Game = (() => {
     ctx.imageSmoothingEnabled = false;
     Scene.build();
     bats = [newBat(1), newBat(6), newBat(12)];
+    snow = Array.from({ length: 140 }, () => ({
+      x: Math.random() * W, y: Math.random() * H, vy: 10 + Math.random() * 22, phase: Math.random() * 6.28, big: Math.random() < 0.2,
+    }));
     let last = performance.now();
     const frame = now => {
       const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
@@ -82,6 +86,11 @@ const Game = (() => {
   }
 
   // ---------------------------------------------------------------- public API
+
+  // Christmas: Santa hats for everyone and falling snow.
+  function setXmas(on) {
+    xmas = on;
+  }
 
   function showIdle(people, idleInfo) {
     runners = lineup(people);
@@ -155,6 +164,7 @@ const Game = (() => {
     updateRunners(dt);
     updateParticles(dt);
     for (const b of bats) updateBat(b, dt);
+    if (xmas) updateSnow(dt);
     updateFade(dt);
   }
 
@@ -317,6 +327,19 @@ const Game = (() => {
     if (b.x > W + 10) Object.assign(b, newBat(4 + Math.random() * 16));
   }
 
+  function updateSnow(dt) {
+    for (const f of snow) {
+      f.y += f.vy * dt;
+      f.x += (Math.sin(time * 1.3 + f.phase) * 10 - camSpeed * (f.big ? 0.9 : 0.5)) * dt;
+      if (f.y > H) {
+        f.y = -2;
+        f.x = Math.random() * W;
+      }
+      if (f.x < -2) f.x += W + 4;
+      else if (f.x > W + 2) f.x -= W + 4;
+    }
+  }
+
   function lightning(big) {
     let x = 30 + Math.random() * 420, y = 0;
     const pts = [[x, y]];
@@ -367,6 +390,7 @@ const Game = (() => {
     drawParticles();
     drawGlows();
     Scene.drawFront(ctx, cam, time);
+    if (xmas) drawSnow();
     Scene.drawVignette(ctx);
     drawLabels();
     drawOverlay();
@@ -423,8 +447,15 @@ const Game = (() => {
     for (const [, draw] of list) draw();
   }
 
+  function drawSnow() {
+    for (const f of snow) {
+      ctx.fillStyle = f.big ? '#f4f0ff' : '#c9c0e2';
+      ctx.fillRect(Math.round(f.x), Math.round(f.y), f.big ? 2 : 1, f.big ? 2 : 1);
+    }
+  }
+
   function drawVillager(r) {
-    const s = Art.villager(r.style);
+    const s = Art.villager(r.style, xmas);
     let img = s.idle, bob = 0;
     if (mode !== 'idle' && !(mode === 'chase' && ct < 0.15)) {
       const f = Math.floor(r.anim) % 4;
@@ -434,11 +465,11 @@ const Game = (() => {
       bob = -1;
     }
     shadow(r.x + 1, r.y, 10);
-    ctx.drawImage(img, r.x, r.y - 18 + bob);
+    ctx.drawImage(img, r.x, r.y - img.height + bob);
   }
 
   function drawMonster() {
-    const S = Art.monster();
+    const S = Art.monster(xmas);
     const x = Math.round(mon.x + mon.lunge);
     const img = mon.pose === 'run' ? S.run[Math.floor(time * 9) % 4] : S[mon.pose];
     const w = img.width * MS, h = img.height * MS;
@@ -450,14 +481,14 @@ const Game = (() => {
     mon.eyes = eyes ? [x + eyes[0] * MS + 1, top + eyes[1] * MS] : null;
     if (mon.pose === 'triumph' && victim) {
       // Held aloft in the raised fist, kicking.
-      ctx.drawImage(Art.villager(victim.style).held[Math.floor(time * 7) % 2], x + 9, top - 10);
+      ctx.drawImage(Art.villager(victim.style, xmas).held[Math.floor(time * 7) % 2], x + 9, top - 10);
     }
   }
 
   function drawFreed() {
-    const img = Art.villager(freed.style).flee[Math.floor(freed.anim) % 4];
+    const img = Art.villager(freed.style, xmas).flee[Math.floor(freed.anim) % 4];
     if (freed.landed) shadow(freed.x + 1, freed.y, 10);
-    ctx.drawImage(img, Math.round(freed.x), Math.round(freed.y) - 18);
+    ctx.drawImage(img, Math.round(freed.x), Math.round(freed.y) - img.height);
   }
 
   function drawParticles() {
@@ -486,14 +517,15 @@ const Game = (() => {
   }
 
   function drawLabels() {
+    const above = 19 + (xmas ? Art.VILLAGER_HAT_LIFT : 0); // clear of the head (and hat)
     for (const r of runners) {
       if (r.caught || r.x < -40 || r.x > W + 10) continue;
       const img = Art.label(r.label, '#f3e6c4');
-      ctx.drawImage(img, Math.round(r.x + 6 - img.width / 2), r.y - 19 - img.height);
+      ctx.drawImage(img, Math.round(r.x + 6 - img.width / 2), r.y - above - img.height);
     }
     if (freed) {
       const img = Art.label(freed.label, '#9fe8a8');
-      ctx.drawImage(img, Math.round(freed.x + 6 - img.width / 2), Math.round(freed.y) - 19 - img.height);
+      ctx.drawImage(img, Math.round(freed.x + 6 - img.width / 2), Math.round(freed.y) - above - img.height);
     }
   }
 
@@ -539,5 +571,5 @@ const Game = (() => {
     ctx.globalAlpha = 1;
   }
 
-  return { init, showIdle, returnToIdle, chase, release };
+  return { init, setXmas, showIdle, returnToIdle, chase, release };
 })();

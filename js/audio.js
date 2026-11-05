@@ -9,6 +9,7 @@ const Sound = (() => {
   let muted = false;
   let wanted = null; // the song that should be playing once audio is unlocked
   let song = null;
+  let xmas = false;
 
   const midi = n => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -30,7 +31,7 @@ const Sound = (() => {
       const data = noiseBuf.getChannelData(0);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
       distortion = new Float32Array(1024).map((_, i) => Math.tanh(((i / 1023) * 2 - 1) * 6));
-      if (wanted) startSong(wanted);
+      if (wanted) startSong(themed(wanted));
     }
     if (ctx.state === 'suspended') ctx.resume();
   }
@@ -95,6 +96,29 @@ const Sound = (() => {
   const BASS_GALLOP = [0, null, 0, 12, 0, null, 0, 12, 0, null, 0, 12, 0, 0, 12, 12];
   const ARPEGGIO = [2, 1, 0, 1, 2, 1, 0, 1, 3, 2, 1, 2, 3, 2, 1, 2];
 
+  // Jingle Bells (the chorus), dragged into D minor. One entry per eighth note, 8 per bar.
+  const JINGLE = [
+    65, -1, 65, -1, 65, -1, -1, -1, 65, -1, 65, -1, 65, -1, -1, -1, 65, -1, 69, -1, 62, -1, -1, 64, 65, -1, -1, -1, -1, -1, -1, -1,
+    67, -1, 67, -1, 67, -1, -1, 67, 67, -1, 65, -1, 65, -1, 65, 65, 65, -1, 64, -1, 64, -1, 65, -1, 64, -1, -1, -1, 69, -1, -1, -1,
+    65, -1, 65, -1, 65, -1, -1, -1, 65, -1, 65, -1, 65, -1, -1, -1, 65, -1, 69, -1, 62, -1, -1, 64, 65, -1, -1, -1, -1, -1, -1, -1,
+    67, -1, 67, -1, 67, -1, -1, 67, 67, -1, 65, -1, 65, -1, 65, 65, 69, -1, 69, -1, 67, -1, 64, -1, 62, -1, -1, -1, -1, -1, -1, -1,
+  ];
+  // Dm, Gm or A under each bar.
+  const JINGLE_ROOTS = [38, 38, 38, 38, 43, 38, 33, 33, 38, 38, 38, 38, 43, 38, 33, 38];
+  const JINGLE_GALLOP = [0, null, 12, 0, 0, null, 12, 0];
+
+  // How many steps a note lasts: itself plus any -1 holds after it.
+  function noteLength(seq, i, max = 8) {
+    let len = 1;
+    while (len < max && seq[(i + len) % seq.length] === -1) len++;
+    return len;
+  }
+
+  function sleighBells(t, vol, bus) {
+    noise({ start: t, dur: 0.09, vol, filter: 'highpass', freq: 7000, dest: bus });
+    noise({ start: t + 0.02, dur: 0.06, vol: vol * 0.8, filter: 'bandpass', freq: 10000, q: 3, dest: bus });
+  }
+
   const SONGS = {
     idle: {
       step: 0.42,
@@ -107,10 +131,46 @@ const Sound = (() => {
         }
         const n = DIRGE[i % DIRGE.length];
         if (n > 0) {
-          let len = 1;
-          while (len < 8 && DIRGE[(i + len) % DIRGE.length] === -1) len++;
+          const len = noteLength(DIRGE, i);
           tone({ type: 'square', freq: midi(n + 12), start: t, dur: sd * len * 0.95, vol: 0.045, attack: 0.02, release: 0.2, dest: bus, vibrato: 5 });
         }
+      },
+    },
+    // A haunted music box: slow, wobbly Jingle Bells over an organ drone.
+    idleXmas: {
+      step: 0.24,
+      play(i, t, sd, bus) {
+        const root = JINGLE_ROOTS[Math.floor(i / 8) % JINGLE_ROOTS.length];
+        if (i % 8 === 0) {
+          tone({ type: 'square', freq: midi(root), start: t, dur: sd * 8, vol: 0.07, attack: 0.2, release: 0.5, dest: bus });
+          tone({ type: 'triangle', freq: midi(root + 12), start: t, dur: sd * 8, vol: 0.08, attack: 0.3, release: 0.6, dest: bus });
+        }
+        const n = JINGLE[i % JINGLE.length];
+        if (n > 0) {
+          const len = noteLength(JINGLE, i);
+          tone({ type: 'triangle', freq: midi(n + 12), start: t, dur: sd * len * 0.9, vol: 0.12, release: 0.15, dest: bus, vibrato: 7 });
+          // A slightly out-of-tune shimmer an octave up.
+          tone({ type: 'sine', freq: midi(n + 24) * 1.006, start: t, dur: Math.min(0.6, sd * len), vol: 0.035, release: 0.3, dest: bus });
+        }
+        if (i % 2 === 0) sleighBells(t, 0.05, bus);
+      },
+    },
+    // The chase: Jingle Bells at a frantic gallop, with a ghostly detuned double an octave down.
+    chaseXmas: {
+      step: 0.1,
+      play(i, t, sd, bus) {
+        const s = i % 8, root = JINGLE_ROOTS[Math.floor(i / 8) % JINGLE_ROOTS.length];
+        const bass = JINGLE_GALLOP[s];
+        if (bass !== null) tone({ type: 'square', freq: midi(root + bass), start: t, dur: sd * 0.8, vol: 0.12, dest: bus });
+        const n = JINGLE[i % JINGLE.length];
+        if (n > 0) {
+          const len = noteLength(JINGLE, i);
+          tone({ type: 'square', freq: midi(n + 12), start: t, dur: sd * len * 0.85, vol: 0.06, dest: bus, vibrato: 4 });
+          tone({ type: 'sawtooth', freq: midi(n) * 0.993, start: t, dur: sd * len * 0.85, vol: 0.025, dest: bus });
+        }
+        if (s % 4 === 0) tone({ type: 'sine', freq: 150, endFreq: 45, start: t, dur: 0.14, vol: 0.55, dest: bus });
+        if (s % 4 === 2) noise({ start: t, dur: 0.12, vol: 0.2, filter: 'bandpass', freq: 1800, q: 0.7, dest: bus });
+        sleighBells(t, s % 2 ? 0.03 : 0.055, bus);
       },
     },
     chase: {
@@ -153,11 +213,20 @@ const Sound = (() => {
     song = null;
   }
 
+  // The Christmas version of a song, when there is one and it's Christmas.
+  const themed = name => (name && xmas && SONGS[name + 'Xmas'] ? name + 'Xmas' : name);
+
   function playMusic(name) {
     wanted = name;
-    if (!ctx || (song && song.name === name)) return;
+    const key = themed(name);
+    if (!ctx || (song && song.name === key)) return;
     stopSong();
-    if (name) startSong(name);
+    if (key) startSong(key);
+  }
+
+  function setXmas(on) {
+    xmas = on;
+    playMusic(wanted);
   }
 
   // ---------------------------------------------------------------- sound effects
@@ -291,7 +360,7 @@ const Sound = (() => {
   }
 
   return {
-    unlock, setMuted, playMusic, stopMusic: () => playMusic(null),
+    unlock, setMuted, setXmas, playMusic, stopMusic: () => playMusic(null),
     whistle, roar, thump, scream, swipe, yelp, thunder, bell,
   };
 })();
